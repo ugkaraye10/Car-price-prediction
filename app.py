@@ -12,7 +12,8 @@ st.title("🚗 Car Price Prediction App")
 def load_data():
     df = pd.read_csv('Car_Price_Prediction.csv')
     df.drop_duplicates(inplace=True)
-    df.fillna(method='ffill', inplace=True)
+    # This is the fix for pandas 2.0+
+    df.ffill(inplace=True) 
     return df
 
 try:
