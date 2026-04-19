@@ -4,61 +4,53 @@ import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import LabelEncoder
 
-# Title of the app
-st.title("Car Price Prediction App")
+st.set_page_config(page_title="Car Price Predictor", page_icon="🚗")
+st.title("🚗 Car Price Prediction App")
 
-# Load data - assumes Car_Price_Prediction.csv is in the same GitHub folder
+# Load data - Ensure Car_Price_Prediction.csv is in your GitHub repo
 @st.cache_data
 def load_data():
     df = pd.read_csv('Car_Price_Prediction.csv')
-    # Basic cleaning matching your notebook
     df.drop_duplicates(inplace=True)
     df.fillna(method='ffill', inplace=True)
     return df
 
-df = load_data()
+try:
+    df = load_data()
+except Exception:
+    st.error("Please upload 'Car_Price_Prediction.csv' to your GitHub repository.")
+    st.stop()
 
 # Sidebar for user inputs
-st.sidebar.header("User Input Features")
+st.sidebar.header("Vehicle Specs")
+make = st.sidebar.selectbox("Manufacturer", sorted(df['Make'].unique()))
+model_list = sorted(df[df['Make'] == make]['Model'].unique())
+car_model = st.sidebar.selectbox("Model", model_list)
+year = st.sidebar.slider("Year", int(df['Year'].min()), 2026, 2020)
+engine = st.sidebar.number_input("Engine Size (L)", 1.0, 6.0, 2.0)
+mileage = st.sidebar.number_input("Mileage", 0, 1000000, 50000)
+fuel = st.sidebar.selectbox("Fuel Type", df['Fuel Type'].unique())
+trans = st.sidebar.selectbox("Transmission", df['Transmission'].unique())
 
-def user_input_features():
-    make = st.sidebar.selectbox("Make", df['Make'].unique())
-    model = st.sidebar.selectbox("Model", df['Model'].unique())
-    year = st.sidebar.slider("Year", int(df['Year'].min()), int(df['Year'].max()), 2015)
-    engine_size = st.sidebar.number_input("Engine Size", min_value=1.0, max_value=5.0, value=2.0)
-    mileage = st.sidebar.number_input("Mileage", value=50000)
-    fuel_type = st.sidebar.selectbox("Fuel Type", df['Fuel Type'].unique())
-    transmission = st.sidebar.selectbox("Transmission", df['Transmission'].unique())
-    
-    data = {
-        'Make': make,
-        'Model': model,
-        'Year': year,
-        'Engine Size': engine_size,
-        'Mileage': mileage,
-        'Fuel Type': fuel_type,
-        'Transmission': transmission
-    }
-    return pd.DataFrame(data, index=[0])
-
-input_df = user_input_features()
-
-# Encoding categorical data
-label_encoders = {}
-for col in ['Make', 'Model', 'Fuel Type', 'Transmission']:
-    le = LabelEncoder()
-    df[col] = le.fit_transform(df[col])
-    label_encoders[col] = le
-    # Map input data using the same encoder
-    input_df[col] = le.transform(input_df[col])
-
-# Simple Model Training (for demo, in production you'd load a saved model)
-X = df.drop('Price', axis=1)
-y = df['Price']
-model = RandomForestRegressor(n_estimators=100, random_state=42)
-model.fit(X, y)
-
-# Prediction
 if st.button("Predict Price"):
-    prediction = model.predict(input_df)
-    st.success(f"The estimated car price is: ${prediction[0]:,.2f}")
+    # Encoding logic
+    df_encoded = df.copy()
+    le = LabelEncoder()
+    cat_cols = ['Make', 'Model', 'Fuel Type', 'Transmission']
+    for col in cat_cols:
+        df_encoded[col] = le.fit_transform(df_encoded[col])
+    
+    # Model Training
+    X = df_encoded.drop('Price', axis=1)
+    y = df_encoded['Price']
+    model = RandomForestRegressor(n_estimators=100, random_state=42)
+    model.fit(X, y)
+    
+    # User Input Processing
+    input_data = pd.DataFrame([[make, car_model, year, engine, mileage, fuel, trans]], columns=X.columns)
+    for col in cat_cols:
+        le.fit(df[col])
+        input_data[col] = le.transform(input_data[col])
+        
+    prediction = model.predict(input_data)
+    st.success(f"Estimated Price: ${prediction[0]:,.2f}")
